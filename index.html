@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Hexnode Genie · Interactive Demo</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  html, body { height: 100%; margin: 0; font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f1f5f9; overflow: hidden; }
+  @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 20px 60px -10px rgba(59, 130, 246, 0.35), 0 0 0 1px rgba(255,255,255,0.1); }
+    50% { box-shadow: 0 25px 70px -10px rgba(139, 92, 246, 0.45), 0 0 0 1px rgba(255,255,255,0.15); }
+  }
+  @keyframes ping {
+    75%, 100% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+  }
+  .ping-ring { animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite; }
+  .pulse-glow { animation: pulseGlow 4s ease-in-out infinite; }
+  .fade-in-up { animation: fadeInUp 0.3s ease-out; }
+  .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+  .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+  .scrollbar-thin::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  pre { font-family: 'Menlo', 'Monaco', 'Courier New', monospace; }
+</style>
+</head>
+<body>
+
+<!-- ROOT -->
+<div id="root" class="w-full h-screen overflow-hidden relative">
+
+  <!-- Portal background (image swapped per scene) -->
+  <div class="absolute inset-0 bg-white pt-14">
+    <img id="portal-img" src="" alt="" class="w-full h-full object-cover object-top hidden" />
+    <div id="portal-placeholder" class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 px-12 text-center">
+      <div id="ph-num" class="text-slate-300 text-6xl font-bold mb-2">1</div>
+      <div id="ph-title" class="text-slate-500 text-lg font-semibold mb-1"></div>
+      <div id="ph-sub" class="text-slate-400 text-sm mb-4"></div>
+      <div class="text-slate-400 text-xs max-w-md italic">
+        Drop images <code class="bg-slate-200 px-1.5 py-0.5 rounded">image-1.png</code> through <code class="bg-slate-200 px-1.5 py-0.5 rounded">image-7.png</code> next to index.html.
+      </div>
+    </div>
+    <!-- Right edge gradient for chat contrast -->
+    <div class="absolute inset-0 pointer-events-none" style="background: linear-gradient(to right, transparent 0%, transparent 55%, rgba(15,23,42,0.12) 100%);"></div>
+  </div>
+
+  <!-- Top bar -->
+  <div class="absolute top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-6 py-3 flex items-center gap-4 shadow-sm">
+    <div class="flex items-center gap-2">
+      <div class="w-7 h-7 rounded bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18"/></svg>
+      </div>
+      <div class="text-slate-900 font-bold text-sm">Hexnode Genie · Interactive Demo</div>
+    </div>
+
+    <div id="scene-nav" class="flex items-center gap-1.5 ml-4"></div>
+
+    <div id="scene-counter" class="text-slate-500 text-xs ml-2"></div>
+
+    <div class="ml-auto flex items-center gap-2">
+      <button id="btn-reset" class="text-slate-500 hover:text-slate-900 text-xs px-3 py-1.5 rounded-lg hover:bg-slate-100 transition-colors">Reset</button>
+      <button id="btn-next-scene" class="hidden bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-1.5 rounded-lg items-center gap-1.5 transition-colors shadow-sm">
+        Next scene
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Hotspot + tooltip container (constrained to portal area) -->
+  <div id="hotspot-layer" class="absolute z-30 pointer-events-none" style="left: 0; top: 56px; right: 460px; bottom: 0;">
+    <!-- Hotspot gets injected here -->
+  </div>
+
+  <!-- Closing card overlay container -->
+  <div id="closing-card" class="hidden absolute z-30 flex items-center justify-center pointer-events-none" style="left: 0; top: 56px; right: 460px; bottom: 0;"></div>
+
+  <!-- Final title overlay container -->
+  <div id="final-title" class="hidden absolute z-30 flex items-center justify-center pointer-events-none" style="left: 0; top: 56px; right: 460px; bottom: 0;"></div>
+
+  <!-- Genie chat panel -->
+  <div class="absolute right-6 top-20 bottom-6 w-[420px] bg-slate-950/95 backdrop-blur-xl border border-slate-700 rounded-2xl flex flex-col z-20 overflow-hidden pulse-glow">
+    <div class="px-5 py-4 border-b border-slate-800 flex items-center gap-3 bg-gradient-to-r from-slate-900 to-slate-950">
+      <div class="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
+        <svg class="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.4 7.6L22 10l-7.6 2.4L12 20l-2.4-7.6L2 10l7.6-2.4z"/></svg>
+      </div>
+      <div class="flex-1">
+        <div class="text-white font-bold text-sm">Hexnode Genie AI</div>
+        <div class="flex items-center gap-1.5">
+          <div class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+          <div class="text-slate-400 text-xs">Online · Ready to help</div>
+        </div>
+      </div>
+    </div>
+    <div id="chat-body" class="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin scroll-smooth">
+      <div id="chat-empty" class="text-center text-slate-500 text-sm mt-16 px-6">
+        <svg class="w-8 h-8 mx-auto mb-3 text-slate-600" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.4 7.6L22 10l-7.6 2.4L12 20l-2.4-7.6L2 10l7.6-2.4z"/></svg>
+        <div>Follow the highlight on the portal to begin.</div>
+      </div>
+    </div>
+    <div class="px-4 py-3 border-t border-slate-800 bg-slate-900/60">
+      <div class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 flex items-center gap-2">
+        <input id="user-input" type="text" readonly placeholder="Ask Genie anything..." class="flex-1 bg-transparent text-white text-sm focus:outline-none placeholder:text-slate-500" />
+        <button class="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center">
+          <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+      <div id="typing-indicator" class="hidden text-slate-500 text-[10px] mt-2 px-1">Admin is typing...</div>
+    </div>
+  </div>
+
+  <!-- Feature ribbon -->
+  <div class="absolute bottom-6 left-6 z-20 max-w-md">
+    <div class="bg-white/95 backdrop-blur-md border border-slate-200 rounded-xl px-4 py-3 shadow-lg">
+      <div class="text-slate-500 text-[10px] uppercase tracking-wider font-semibold mb-1">Feature in play</div>
+      <div id="feature-text" class="text-slate-900 text-sm font-medium leading-snug"></div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+</div>
+
+<script>
+// ============================================================
+// CONFIG — edit these to fine-tune the demo
+// ============================================================
+
+// Map each scene to an image file living next to this index.html
+const PORTAL_FILES = {
+  1: "image-2.png",
+  2: "image-5.png",
+  3: "image-1.png",
+  4: "image-1.png",
+  5: "image-6.png",
+  6: "image-4.png",
+  7: "image-7.png",
+  8: "image-1.png",
+};
+
+// Hotspot positions in % of portal area (left ~62% of screen)
+const HOTSPOTS = {
+  1: { xPct: 70, yPct: 70, tooltipSide: "left" },
+  2: { xPct: 45, yPct: 45, tooltipSide: "right" },
+  3: { xPct: 60, yPct: 22, tooltipSide: "bottom" },
+  4: { xPct: 45, yPct: 55, tooltipSide: "right" },
+  5: { xPct: 30, yPct: 65, tooltipSide: "right" },
+  6: { xPct: 45, yPct: 55, tooltipSide: "right" },
+  7: { xPct: 25, yPct: 40, tooltipSide: "right" },
+  8: { xPct: 50, yPct: 50, tooltipSide: "right" },
+};
+
+const TYPE_SPEED = 18;
+const USER_TYPE_SPEED = 35;
+const AUTO_ADVANCE_MS = 3500; // delay after Genie finishes before moving to next scene
+
+// ============================================================
+// ICONS (lucide paths inlined as SVG strings)
+// ============================================================
+const ICONS = {
+  sparkles: '<path d="M12 0l2.4 7.6L22 10l-7.6 2.4L12 20l-2.4-7.6L2 10l7.6-2.4z"/>',
+  wifi: '<path d="M5 13a10 10 0 0 1 14 0M8.5 16.5a5 5 0 0 1 7 0M2 8.82a15 15 0 0 1 20 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+  alert: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  chart: '<line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/>',
+  code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+  chevronRight: '<polyline points="9 18 15 12 9 6"/>',
+};
+
+function svg(iconName, classes = "w-4 h-4") {
+  return `<svg class="${classes}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONS[iconName] || ""}</svg>`;
+}
+
+// ============================================================
+// SCENES
+// ============================================================
+const SCENES = [
+  {
+    id: 1,
+    title: "First login",
+    subtitle: "Maple & Co. — 47 stores, 500 devices",
+    hotspotLabel: "You're the new IT admin at Maple & Co. — 47 stores, 500 devices. Click here to start a conversation with Hexnode Genie.",
+    feature: "Centralized AI support begins in one thread.",
+    icon: "sparkles",
+    intro: "👋 Welcome to Hexnode, admin! I'm Genie — your AI copilot. Ask me anything about your fleet: policies, devices, compliance, scripts. I'll handle the heavy lifting.",
+  },
+  {
+    id: 2,
+    title: "Store #14 Wi-Fi issue",
+    subtitle: "POS terminal won't connect",
+    hotspotLabel: "Store #14 just called — their POS terminal won't connect to Wi-Fi. You don't know where the policy lives yet. Just ask Genie.",
+    feature: "Natural language navigation + in-chat policy intelligence.",
+    icon: "wifi",
+    userPrompt: "Show me the Wi-Fi policy for East region stores.",
+    response: {
+      text: "Here's the active Wi-Fi policy assigned to East region stores:",
+      card: {
+        type: "policy",
+        title: "East-Region-WiFi-Policy",
+        rows: [
+          ["SSID", "Maple-Corp-5G"],
+          ["Security", "WPA2-Enterprise"],
+          ["Assigned to", "East Region (12 stores)"],
+          ["Store #14 coverage", "✓ Included"],
+          ["Devices applied", "128 devices"],
+          ["Last modified", "Nov 14, 2025 · 09:42 AM"],
+        ],
+      },
+    },
+  },
+  {
+    id: 3,
+    title: "Compliance alert",
+    subtitle: "6 devices failed overnight",
+    hotspotLabel: "While you were on the Wi-Fi policy, 6 new compliance failures appeared overnight. Ask Genie what's going on.",
+    feature: "Fleet-aware troubleshooting and root-cause analysis.",
+    icon: "alert",
+    userPrompt: "Why are 6 devices showing failed compliance?",
+    response: {
+      text: "I checked the fleet pattern. Here's what's going on:",
+      card: {
+        type: "diagnosis",
+        finding: "All 6 failures are Windows POS devices — 5 from the latest Store #22 imaging batch, 1 from Store #38.",
+        rootCause: "They failed the encryption compliance check (BitLocker not enforced post-imaging).",
+        fix: [
+          "Enforce the encryption policy on the affected device group",
+          "Restart the devices remotely",
+          "Re-run the compliance check",
+        ],
+      },
+    },
+  },
+  {
+    id: 4,
+    title: "Compliance report",
+    subtitle: "Fleet-wide health check",
+    hotspotLabel: "Those 6 failures might be part of something bigger. Ask Genie for a fleet-wide read on compliance.",
+    feature: "Data reporting, analysis, and prioritization.",
+    icon: "chart",
+    userPrompt: "Generate a compliance report and tell me what stands out.",
+    response: {
+      text: "Report generated. Here's what stands out:",
+      card: {
+        type: "report",
+        summary: "16 of 500 devices non-compliant (96.8% healthy)",
+        breakdown: [
+          { label: "Non-encrypted (Windows)", count: 9, severity: "high", note: "Mostly Store #22 & #38" },
+          { label: "OS updates pending", count: 5, severity: "medium", note: "Mixed iOS / Android" },
+          { label: "Kiosk app version mismatch", count: 2, severity: "low", note: "Store #7" },
+        ],
+        priority: "Encryption is the biggest gap. Fix that first — it covers 56% of non-compliant devices.",
+      },
+    },
+  },
+  {
+    id: 5,
+    title: "Store #22 — POS lane down",
+    subtitle: "Scripting expert on leave",
+    hotspotLabel: "Store #22 now has a POS lane down. The scripting expert is on leave. Ask Genie to write the fix.",
+    feature: "AI-assisted scripting with practical remediation context.",
+    icon: "code",
+    userPrompt: "Write a script to clear browser cache on all Windows devices and apply to Store #22.",
+    response: {
+      text: "Drafted a PowerShell script scoped to Windows devices in Store #22. Review and approve to deploy:",
+      card: {
+        type: "script",
+        language: "PowerShell",
+        scope: "Windows devices · Store #22 device group (8 devices)",
+        purpose: "Clears Chrome, Edge, and Firefox cache + cookies for all user profiles.",
+        code: `# Clear browser cache - Store #22 POS recovery
+$browsers = @(
+  "$env:LOCALAPPDATA\\Google\\Chrome\\User Data\\Default\\Cache",
+  "$env:LOCALAPPDATA\\Microsoft\\Edge\\User Data\\Default\\Cache",
+  "$env:APPDATA\\Mozilla\\Firefox\\Profiles"
+)
+foreach ($path in $browsers) {
+  if (Test-Path $path) {
+    Remove-Item "$path\\*" -Recurse -Force -ErrorAction SilentlyContinue
+    Write-Host "Cleared: $path"
+  }
+}
+Restart-Service -Name "Spooler" -Force
+Write-Host "POS cache cleanup complete."`,
+      },
+    },
+  },
+  {
+    id: 6,
+    title: "VP request — Holiday iPad lockdown",
+    subtitle: "47 visual merchandiser iPads",
+    hotspotLabel: "VP just messaged: lock the 47 visual merchandiser iPads to the Lookbook app for the holiday window. Camera and screenshots off.",
+    feature: "Policy creation from natural language + approval-gated execution.",
+    icon: "lock",
+    userPrompt: "Lock 47 visual merchandiser iPads to the Lookbook app. Disable camera and screenshots.",
+    response: {
+      text: "Drafted the kiosk policy. Review before I deploy:",
+      card: {
+        type: "policy-draft",
+        name: "Holiday-Lookbook-Kiosk-iOS",
+        target: "47 visual merchandiser iPads (group: VM-iPads-All)",
+        settings: [
+          { label: "Lockdown mode", value: "Single-App (Autonomous)" },
+          { label: "Allowed app", value: "Lookbook" },
+          { label: "Camera", value: "Disabled", flag: true },
+          { label: "Screenshots", value: "Disabled", flag: true },
+          { label: "AirDrop", value: "Disabled" },
+          { label: "Schedule", value: "Nov 25 → Jan 5" },
+        ],
+      },
+    },
+  },
+  {
+    id: 7,
+    title: "Carry the work forward",
+    subtitle: "West region — same policy",
+    hotspotLabel: "The whole day's work is still in this thread. Now extend the Lookbook lockdown to the West region — without re-explaining anything.",
+    feature: "Context memory, follow-up actions, centralized AI support.",
+    icon: "sparkles",
+    userPrompt: "Do the same for the West region.",
+    response: {
+      text: "Got it — applying the Lookbook lockdown (camera + screenshots disabled) to West region visual merchandiser iPads. Drafted:",
+      card: {
+        type: "policy-draft",
+        name: "Holiday-Lookbook-Kiosk-iOS-West",
+        target: "38 visual merchandiser iPads (group: VM-iPads-West)",
+        settings: [
+          { label: "Lockdown mode", value: "Single-App (Autonomous)" },
+          { label: "Allowed app", value: "Lookbook" },
+          { label: "Camera", value: "Disabled", flag: true },
+          { label: "Screenshots", value: "Disabled", flag: true },
+          { label: "AirDrop", value: "Disabled" },
+          { label: "Schedule", value: "Nov 25 → Jan 5" },
+        ],
+      },
+    },
+  },
+  {
+    id: 8,
+    title: "Day one. Done.",
+    subtitle: "From new admin to fleet operator",
+    feature: "One agent. One conversation. This is Hexnode Genie.",
+    icon: "check",
+    isClosing: true,
+  },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  sceneIdx: 0,
+  messages: [],
+  approvals: {},
+  phase: "hotspot", // hotspot | responding | done
+  autoAdvanceTimer: null,
+  autoAdvanceCancelled: false,
+};
+
+function scene() { return SCENES[state.sceneIdx]; }
+function isLastScene() { return state.sceneIdx === SCENES.length - 1; }
+
+// ============================================================
+// RENDER: scene icons
+// ============================================================
+function renderSceneNav() {
+  const nav = document.getElementById("scene-nav");
+  nav.innerHTML = "";
+
+  // Build a stepper: circles connected by lines
+  const wrapper = document.createElement("div");
+  wrapper.className = "flex items-center gap-0";
+
+  SCENES.forEach((s, i) => {
+    const isActive = i === state.sceneIdx;
+    const isPast = i < state.sceneIdx;
+    const isFuture = i > state.sceneIdx;
+
+    // Step circle
+    const stepWrapper = document.createElement("div");
+    stepWrapper.className = "relative flex flex-col items-center";
+
+    const circle = document.createElement("button");
+    circle.title = `Scene ${s.id}: ${s.title}`;
+    circle.className = `relative z-10 flex items-center justify-center transition-all rounded-full ${
+      isActive
+        ? "w-8 h-8 bg-blue-600 text-white shadow-md shadow-blue-500/40 ring-4 ring-blue-100"
+        : isPast
+        ? "w-7 h-7 bg-blue-600 text-white hover:bg-blue-700"
+        : "w-7 h-7 bg-white border-2 border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-600"
+    }`;
+    circle.onclick = () => jumpToScene(i);
+
+    if (isPast) {
+      // Show checkmark for completed steps
+      circle.innerHTML = svg("check", "w-3.5 h-3.5");
+    } else if (isActive) {
+      circle.innerHTML = svg(s.icon, "w-4 h-4");
+    } else {
+      circle.innerHTML = `<span class="text-[11px] font-bold">${s.id}</span>`;
+    }
+
+    stepWrapper.appendChild(circle);
+    wrapper.appendChild(stepWrapper);
+
+    // Connecting line (except after last step)
+    if (i < SCENES.length - 1) {
+      const line = document.createElement("div");
+      line.className = `h-0.5 transition-all ${isPast ? "bg-blue-600" : "bg-slate-200"}`;
+      line.style.width = "28px";
+      wrapper.appendChild(line);
+    }
+  });
+
+  nav.appendChild(wrapper);
+
+  // Active scene label (right of the stepper)
+  const activeScene = SCENES[state.sceneIdx];
+  const label = document.createElement("div");
+  label.className = "ml-4 flex flex-col";
+  label.innerHTML = `
+    <div class="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Scene ${activeScene.id} of ${SCENES.length}</div>
+    <div class="text-sm font-semibold text-slate-900 leading-tight">${activeScene.title}</div>
+  `;
+  nav.appendChild(label);
+
+  // Hide the separate scene-counter element (now redundant)
+  document.getElementById("scene-counter").textContent = "";
+}
+
+// ============================================================
+// RENDER: portal background
+// ============================================================
+function renderPortal() {
+  const s = scene();
+  const img = document.getElementById("portal-img");
+  const ph = document.getElementById("portal-placeholder");
+  const file = PORTAL_FILES[s.id];
+
+  // Probe image existence by trying to load
+  if (file) {
+    const test = new Image();
+    test.onload = () => {
+      img.src = file;
+      img.classList.remove("hidden");
+      ph.classList.add("hidden");
+    };
+    test.onerror = () => {
+      img.classList.add("hidden");
+      ph.classList.remove("hidden");
+      document.getElementById("ph-num").textContent = s.id;
+      document.getElementById("ph-title").textContent = s.title;
+      document.getElementById("ph-sub").textContent = s.subtitle;
+    };
+    test.src = file;
+  } else {
+    img.classList.add("hidden");
+    ph.classList.remove("hidden");
+  }
+
+  document.getElementById("feature-text").textContent = s.feature;
+}
+
+// ============================================================
+// RENDER: hotspot + tooltip
+// ============================================================
+function renderHotspot() {
+  const layer = document.getElementById("hotspot-layer");
+  layer.innerHTML = "";
+
+  const closingCard = document.getElementById("closing-card");
+  const finalTitle = document.getElementById("final-title");
+  closingCard.classList.add("hidden");
+  finalTitle.classList.add("hidden");
+
+  const s = scene();
+
+  // Closing scene gets its own overlays
+  if (s.isClosing) {
+    if (state.phase === "hotspot") {
+      closingCard.classList.remove("hidden");
+      closingCard.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 p-8 max-w-lg pointer-events-auto fade-in-up">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-500 to-blue-600 flex items-center justify-center text-white">${svg("check", "w-6 h-6")}</div>
+            <div>
+              <div class="text-emerald-600 text-xs font-bold uppercase tracking-wider">Day One Complete</div>
+              <div class="text-slate-900 text-xl font-bold">Day one. Done.</div>
+            </div>
+          </div>
+          <div class="text-slate-700 text-sm leading-relaxed mb-4">
+            The story started with a new admin who didn't know where anything lived. It ends with that same admin <span class="font-semibold text-slate-900">navigating, diagnosing, reporting, scripting, creating policy, and deploying action</span> — all from one conversation.
+          </div>
+          <div class="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-4 space-y-1.5">
+            <div class="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">On the dashboard now</div>
+            <div class="flex items-center gap-2 text-xs text-slate-700"><span class="text-emerald-600">${svg("check", "w-3 h-3")}</span> Store #14 has policy visibility</div>
+            <div class="flex items-center gap-2 text-xs text-slate-700"><span class="text-emerald-600">${svg("check", "w-3 h-3")}</span> Store #22 remediation script deployed</div>
+            <div class="flex items-center gap-2 text-xs text-slate-700"><span class="text-emerald-600">${svg("check", "w-3 h-3")}</span> Compliance risks understood & queued</div>
+            <div class="flex items-center gap-2 text-xs text-slate-700"><span class="text-emerald-600">${svg("check", "w-3 h-3")}</span> 47 East iPads locked to Lookbook</div>
+            <div class="flex items-center gap-2 text-xs text-slate-700"><span class="text-emerald-600">${svg("check", "w-3 h-3")}</span> 38 West iPads queued for same policy</div>
+          </div>
+          <button id="closing-trigger" class="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-sm font-semibold py-3 rounded-lg flex items-center justify-center gap-1.5 transition-all">
+            See Genie's wrap-up ${svg("chevronRight", "w-4 h-4")}
+          </button>
+        </div>
+      `;
+      document.getElementById("closing-trigger").onclick = triggerGenie;
+    } else if (state.phase === "done") {
+      finalTitle.classList.remove("hidden");
+      finalTitle.innerHTML = `
+        <div class="absolute inset-0 bg-slate-950/85 backdrop-blur-sm pointer-events-auto"></div>
+        <div class="relative text-center px-8 pointer-events-auto fade-in-up">
+          <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 mb-6 shadow-2xl shadow-blue-500/30">
+            <svg class="w-9 h-9 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0l2.4 7.6L22 10l-7.6 2.4L12 20l-2.4-7.6L2 10l7.6-2.4z"/></svg>
+          </div>
+          <div class="text-blue-300 text-xs uppercase tracking-[0.3em] font-semibold mb-4">One agent · One conversation</div>
+          <div class="text-white text-6xl font-bold mb-4 leading-tight" style="letter-spacing: -0.02em;">This is Hexnode Genie.</div>
+          <div class="text-slate-300 text-lg mb-8">From new admin to fleet operator — in one thread.</div>
+          <button onclick="resetDemo()" class="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-sm font-semibold px-6 py-2.5 rounded-lg transition-colors">
+            Restart demo
+          </button>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  // Regular scenes: hotspot + tooltip when in "hotspot" phase
+  if (state.phase !== "hotspot") return;
+
+  const pos = HOTSPOTS[s.id] || { xPct: 50, yPct: 50, tooltipSide: "right" };
+
+  const tooltipStyle = (() => {
+    if (pos.tooltipSide === "right") return "left: 32px; top: 50%; transform: translateY(-50%);";
+    if (pos.tooltipSide === "left") return "right: 32px; top: 50%; transform: translateY(-50%);";
+    if (pos.tooltipSide === "top") return "left: 50%; bottom: 32px; transform: translateX(-50%);";
+    if (pos.tooltipSide === "bottom") return "left: 50%; top: 32px; transform: translateX(-50%);";
+    return "";
+  })();
+
+  layer.innerHTML = `
+    <div class="absolute" style="left: ${pos.xPct}%; top: ${pos.yPct}%; transform: translate(-50%, -50%); pointer-events: none;">
+      <div class="relative" style="width: 20px; height: 20px;">
+        <div class="absolute top-1/2 left-1/2 w-6 h-6 rounded-full bg-blue-500/40 ping-ring" style="transform: translate(-50%, -50%);"></div>
+        <div class="absolute top-1/2 left-1/2 w-10 h-10 rounded-full bg-blue-500/15 ping-ring" style="transform: translate(-50%, -50%); animation-delay: 0.4s;"></div>
+        <div class="absolute top-1/2 left-1/2 w-5 h-5 rounded-full bg-blue-500 border-2 border-white shadow-lg" style="transform: translate(-50%, -50%); box-shadow: 0 0 20px rgba(59,130,246,0.6);"></div>
+      </div>
+      <div class="absolute bg-white rounded-xl shadow-2xl border border-slate-200 p-4 fade-in-up" style="${tooltipStyle} width: 320px; pointer-events: auto;">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap">SCENE ${s.id}</div>
+          <div class="text-slate-900 font-semibold text-sm truncate">${s.title}</div>
+        </div>
+        <div class="text-slate-700 text-sm leading-relaxed mb-3">${s.hotspotLabel}</div>
+        <button id="hotspot-next" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 rounded-lg flex items-center justify-center gap-1.5 transition-colors">
+          ${isLastScene() ? "Wrap up" : "Watch Genie respond"} ${svg("chevronRight", "w-4 h-4")}
+        </button>
+      </div>
+    </div>
+  `;
+  document.getElementById("hotspot-next").onclick = triggerGenie;
+}
+
+// ============================================================
+// RENDER: chat messages
+// ============================================================
+function renderMessages() {
+  const body = document.getElementById("chat-body");
+  const empty = document.getElementById("chat-empty");
+
+  if (state.messages.length === 0) {
+    empty.classList.remove("hidden");
+  } else {
+    empty.classList.add("hidden");
+  }
+
+  // Keep empty placeholder if no messages
+  const existingMessages = body.querySelectorAll("[data-msg-id]");
+  existingMessages.forEach(el => el.remove());
+
+  state.messages.forEach(msg => {
+    const el = document.createElement("div");
+    el.setAttribute("data-msg-id", msg.id);
+
+    if (msg.role === "user") {
+      el.className = "flex justify-end mb-4";
+      el.innerHTML = `<div class="bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[85%] text-sm">${escapeHtml(msg.text)}</div>`;
+    } else {
+      const cardHtml = msg.card && !msg.typing ? renderCard(msg) : "";
+      el.className = "flex gap-2 mb-4";
+      el.innerHTML = `
+        <div class="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0 text-white">${svg("sparkles", "w-3.5 h-3.5")}</div>
+        <div class="max-w-[85%] flex-1">
+          <div class="bg-slate-800/90 text-slate-100 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm leading-relaxed" style="white-space: pre-wrap;">${escapeHtml(msg.text)}${msg.typing ? '<span class="inline-block w-1.5 h-3.5 bg-blue-400 ml-0.5 animate-pulse align-middle"></span>' : ''}</div>
+          ${cardHtml}
+        </div>
+      `;
+    }
+    body.appendChild(el);
+  });
+
+  // Bind approval buttons
+  state.messages.forEach(msg => {
+    if (msg.card && msg.card.type === "script" && !state.approvals[msg.id] && !msg.typing) {
+      const approve = document.querySelector(`[data-approve-id="${msg.id}"]`);
+      const deny = document.querySelector(`[data-deny-id="${msg.id}"]`);
+      if (approve) approve.onclick = () => handleApprove(msg.id, "script");
+      if (deny) deny.onclick = () => handleDeny(msg.id);
+    }
+    if (msg.card && msg.card.type === "policy-draft" && !state.approvals[msg.id] && !msg.typing) {
+      const approve = document.querySelector(`[data-approve-id="${msg.id}"]`);
+      const deny = document.querySelector(`[data-deny-id="${msg.id}"]`);
+      if (approve) approve.onclick = () => handleApprove(msg.id, "policy");
+      if (deny) deny.onclick = () => handleDeny(msg.id);
+    }
+  });
+
+  body.scrollTop = body.scrollHeight;
+}
+
+function renderCard(msg) {
+  const c = msg.card;
+  const approved = state.approvals[msg.id];
+
+  if (c.type === "policy") {
+    return `
+      <div class="bg-slate-800/90 border border-blue-500/40 rounded-xl p-4 mt-2">
+        <div class="flex items-center gap-2 mb-3 text-blue-400">${svg("shield", "w-4 h-4")}<div class="font-semibold text-sm">${c.title}</div></div>
+        <div class="space-y-2">
+          ${c.rows.map(([k, v]) => `<div class="flex justify-between text-xs gap-3"><span class="text-slate-400">${k}</span><span class="text-slate-100 font-medium text-right">${v}</span></div>`).join("")}
+        </div>
+      </div>
+    `;
+  }
+  if (c.type === "diagnosis") {
+    return `
+      <div class="bg-slate-800/90 border border-red-500/40 rounded-xl p-4 mt-2">
+        <div class="flex items-center gap-2 mb-3 text-red-400">${svg("alert", "w-4 h-4")}<div class="font-semibold text-sm">Pattern detected</div></div>
+        <div class="space-y-3 text-xs">
+          <div><div class="text-slate-400 mb-1">Finding</div><div class="text-slate-100 leading-relaxed">${c.finding}</div></div>
+          <div><div class="text-slate-400 mb-1">Root cause</div><div class="text-slate-100 leading-relaxed">${c.rootCause}</div></div>
+          <div><div class="text-slate-400 mb-1">Suggested fix</div><ol class="text-slate-100 list-decimal list-inside space-y-1 leading-relaxed">${c.fix.map(f => `<li>${f}</li>`).join("")}</ol></div>
+        </div>
+      </div>
+    `;
+  }
+  if (c.type === "report") {
+    const sev = { high: "text-red-400 bg-red-500/15", medium: "text-amber-400 bg-amber-500/15", low: "text-blue-400 bg-blue-500/15" };
+    return `
+      <div class="bg-slate-800/90 border border-indigo-500/40 rounded-xl p-4 mt-2">
+        <div class="flex items-center gap-2 mb-3 text-indigo-400">${svg("chart", "w-4 h-4")}<div class="font-semibold text-sm">Compliance Report</div></div>
+        <div class="text-slate-100 text-sm font-semibold mb-3">${c.summary}</div>
+        <div class="space-y-2 mb-3">
+          ${c.breakdown.map(b => `
+            <div class="flex items-center justify-between text-xs bg-slate-900/80 rounded-lg px-3 py-2">
+              <div class="flex-1"><div class="text-slate-100">${b.label}</div><div class="text-slate-500 text-[10px] mt-0.5">${b.note}</div></div>
+              <div class="px-2.5 py-1 rounded-md font-bold ${sev[b.severity]}">${b.count}</div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="text-xs text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5 leading-relaxed"><span class="font-semibold">Priority: </span>${c.priority}</div>
+      </div>
+    `;
+  }
+  if (c.type === "script") {
+    return `
+      <div class="bg-slate-800/90 border border-emerald-500/40 rounded-xl p-4 mt-2">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-emerald-400">${svg("code", "w-4 h-4")}</span>
+          <div class="text-emerald-400 font-semibold text-sm">${c.language} Script</div>
+          ${approved ? '<div class="ml-auto text-[10px] bg-emerald-500/30 text-emerald-200 px-2 py-1 rounded font-semibold">✓ Deployed</div>' : ''}
+        </div>
+        <div class="text-xs text-slate-400 mb-1">Scope</div><div class="text-xs text-slate-100 mb-2">${c.scope}</div>
+        <div class="text-xs text-slate-400 mb-1">Purpose</div><div class="text-xs text-slate-100 mb-3">${c.purpose}</div>
+        <pre class="bg-slate-950 text-emerald-300 text-[10px] p-3 rounded-lg overflow-x-auto leading-relaxed max-h-48 overflow-y-auto">${escapeHtml(c.code)}</pre>
+        ${!approved ? `
+          <div class="flex gap-2 mt-3">
+            <button data-approve-id="${msg.id}" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1 transition-colors">${svg("check", "w-3 h-3")} Approve & Run</button>
+            <button data-deny-id="${msg.id}" class="px-3 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-semibold py-2 rounded-lg flex items-center justify-center transition-colors">${svg("x", "w-3 h-3")}</button>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }
+  if (c.type === "policy-draft") {
+    return `
+      <div class="bg-slate-800/90 border border-purple-500/40 rounded-xl p-4 mt-2">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="text-purple-400">${svg("lock", "w-4 h-4")}</span>
+          <div class="text-purple-400 font-semibold text-sm">${c.name}</div>
+          ${approved ? '<div class="ml-auto text-[10px] bg-emerald-500/30 text-emerald-200 px-2 py-1 rounded font-semibold">✓ Deployed</div>' : '<div class="ml-auto text-[10px] bg-amber-500/20 text-amber-300 px-2 py-1 rounded font-semibold">Draft</div>'}
+        </div>
+        <div class="text-xs text-slate-400 mb-1">Target</div><div class="text-xs text-slate-100 mb-3">${c.target}</div>
+        <div class="space-y-1.5 mb-3">
+          ${c.settings.map(s => `<div class="flex justify-between text-xs"><span class="text-slate-400">${s.label}</span><span class="font-medium ${s.flag ? 'text-red-300' : 'text-slate-100'}">${s.value}</span></div>`).join("")}
+        </div>
+        ${!approved ? `
+          <div class="flex gap-2">
+            <button data-approve-id="${msg.id}" class="flex-1 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold py-2 rounded-lg flex items-center justify-center gap-1 transition-colors">${svg("check", "w-3 h-3")} Approve & Deploy</button>
+            <button data-deny-id="${msg.id}" class="px-3 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-semibold py-2 rounded-lg flex items-center justify-center transition-colors">${svg("x", "w-3 h-3")}</button>
+          </div>
+        ` : ""}
+      </div>
+    `;
+  }
+  return "";
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ============================================================
+// ACTIONS
+// ============================================================
+function triggerGenie() {
+  state.phase = "responding";
+  renderHotspot();
+
+  const s = scene();
+
+  if (s.isClosing) {
+    setTimeout(() => {
+      const id = `m-${Date.now()}`;
+      state.messages.push({ id, role: "assistant", text: "", typing: true });
+      renderMessages();
+      typeMessage(id, "Day one wrap-up:\n\n✓ Store #14 Wi-Fi diagnosed\n✓ 6 compliance failures identified & resolution queued\n✓ Fleet compliance report generated\n✓ Store #22 POS recovery script deployed\n✓ 47 East-region iPads locked to Lookbook\n✓ 38 West-region iPads queued for same policy\n\nAll from one conversation. That's Hexnode Genie.", null, () => {
+        state.phase = "done";
+        renderHotspot();
+        updateNextButton();
+        // No auto-advance on closing scene
+      });
+    }, 300);
+    return;
+  }
+
+  if (state.sceneIdx === 0) {
+    setTimeout(() => {
+      const id = `m-${Date.now()}`;
+      state.messages.push({ id, role: "assistant", text: "", typing: true });
+      renderMessages();
+      typeMessage(id, s.intro, null, onGenieFinished);
+    }, 300);
+  } else {
+    setTimeout(() => {
+      typeUserPrompt(s.userPrompt, () => {
+        setTimeout(() => {
+          const id = `m-${Date.now()}`;
+          state.messages.push({ id, role: "assistant", text: "", typing: true, card: null });
+          renderMessages();
+          typeMessage(id, s.response.text, s.response.card, onGenieFinished);
+        }, 400);
+      });
+    }, 300);
+  }
+}
+
+function typeUserPrompt(text, onDone) {
+  const input = document.getElementById("user-input");
+  const indicator = document.getElementById("typing-indicator");
+  indicator.classList.remove("hidden");
+  let i = 0;
+  const interval = setInterval(() => {
+    i++;
+    input.value = text.slice(0, i);
+    if (i >= text.length) {
+      clearInterval(interval);
+      setTimeout(() => {
+        const id = `u-${Date.now()}`;
+        state.messages.push({ id, role: "user", text });
+        renderMessages();
+        input.value = "";
+        indicator.classList.add("hidden");
+        onDone && onDone();
+      }, 300);
+    }
+  }, USER_TYPE_SPEED);
+}
+
+function typeMessage(id, text, card, onDone) {
+  let i = 0;
+  const interval = setInterval(() => {
+    i++;
+    const msg = state.messages.find(m => m.id === id);
+    if (msg) msg.text = text.slice(0, i);
+    renderMessages();
+    if (i >= text.length) {
+      clearInterval(interval);
+      const m = state.messages.find(x => x.id === id);
+      if (m) {
+        m.typing = false;
+        m.card = card;
+      }
+      renderMessages();
+      onDone && onDone();
+    }
+  }, TYPE_SPEED);
+}
+
+function handleApprove(msgId, kind) {
+  state.approvals[msgId] = true;
+  renderMessages();
+  hideApprovalHint();
+  showToast(kind === "policy" ? "Policy deployed to target devices" : "Script executed successfully");
+  // Now that approval is done, kick off auto-advance to the next scene
+  startAutoAdvance();
+}
+function handleDeny() {
+  hideApprovalHint();
+  showToast("Action cancelled");
+  // Denying does not auto-advance — presenter chooses what to do next
+}
+
+function showToast(message) {
+  const container = document.getElementById("toast-container");
+  const el = document.createElement("div");
+  el.className = "fixed bottom-6 right-6 z-50 bg-slate-900 border border-emerald-500/40 text-white px-5 py-4 rounded-xl shadow-2xl flex items-center gap-3";
+  el.style.minWidth = "320px";
+  el.style.animation = "slideIn 0.3s ease-out";
+  el.innerHTML = `
+    <div class="bg-emerald-500/20 p-2 rounded-lg text-emerald-400">${svg("check", "w-5 h-5")}</div>
+    <div class="text-sm font-medium">${message}</div>
+  `;
+  container.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+function onGenieFinished() {
+  state.phase = "done";
+  renderHotspot();
+  updateNextButton();
+
+  // If the latest Genie message has a card that requires approval,
+  // wait for the user to click Approve before auto-advancing.
+  const lastMsg = [...state.messages].reverse().find(m => m.role === "assistant" && m.card);
+  const requiresApproval = lastMsg && lastMsg.card &&
+    (lastMsg.card.type === "script" || lastMsg.card.type === "policy-draft");
+
+  if (requiresApproval) {
+    showApprovalHint();
+    return;
+  }
+
+  startAutoAdvance();
+}
+
+function showApprovalHint() {
+  let el = document.getElementById("approval-hint");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "approval-hint";
+    el.className = "fixed bottom-6 right-6 z-50 bg-slate-900 border border-amber-500/40 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3";
+    el.style.minWidth = "280px";
+    el.style.animation = "slideIn 0.3s ease-out";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = `
+    <div class="bg-amber-500/20 text-amber-300 p-2 rounded-lg">
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div class="flex-1">
+      <div class="text-xs text-amber-300 font-semibold uppercase tracking-wider">Waiting for human approval</div>
+      <div class="text-sm text-white">Click <span class="font-semibold">Approve</span> in the chat to deploy.</div>
+    </div>
+  `;
+}
+
+function hideApprovalHint() {
+  const el = document.getElementById("approval-hint");
+  if (el) el.remove();
+}
+
+function updateNextButton() {
+  const btn = document.getElementById("btn-next-scene");
+  if (state.phase === "done" && !isLastScene()) {
+    btn.classList.remove("hidden");
+    btn.classList.add("flex");
+    btn.style.animation = "fadeInUp 0.3s ease-out";
+  } else {
+    btn.classList.add("hidden");
+    btn.classList.remove("flex");
+  }
+}
+
+function startAutoAdvance() {
+  // Don't auto-advance on the last (closing) scene
+  if (isLastScene()) return;
+
+  state.autoAdvanceCancelled = false;
+  const startTime = Date.now();
+  const total = AUTO_ADVANCE_MS;
+
+  // Render countdown immediately
+  renderCountdown(total);
+
+  state.autoAdvanceTimer = setInterval(() => {
+    if (state.autoAdvanceCancelled) {
+      clearInterval(state.autoAdvanceTimer);
+      state.autoAdvanceTimer = null;
+      hideCountdown();
+      return;
+    }
+    const elapsed = Date.now() - startTime;
+    const remaining = total - elapsed;
+    if (remaining <= 0) {
+      clearInterval(state.autoAdvanceTimer);
+      state.autoAdvanceTimer = null;
+      hideCountdown();
+      nextScene();
+    } else {
+      renderCountdown(remaining);
+    }
+  }, 100);
+}
+
+function cancelAutoAdvance() {
+  state.autoAdvanceCancelled = true;
+  if (state.autoAdvanceTimer) {
+    clearInterval(state.autoAdvanceTimer);
+    state.autoAdvanceTimer = null;
+  }
+  hideCountdown();
+}
+
+function renderCountdown(remainingMs) {
+  let el = document.getElementById("auto-advance-countdown");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "auto-advance-countdown";
+    el.className = "fixed bottom-6 right-6 z-50 bg-slate-900 border border-blue-500/40 text-white rounded-xl shadow-2xl px-4 py-3 flex items-center gap-3";
+    el.style.minWidth = "260px";
+    el.style.animation = "slideIn 0.3s ease-out";
+    document.body.appendChild(el);
+  }
+  const seconds = Math.ceil(remainingMs / 1000);
+  const progress = 1 - (remainingMs / AUTO_ADVANCE_MS);
+  el.innerHTML = `
+    <div class="relative w-8 h-8 flex-shrink-0">
+      <svg class="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
+        <circle cx="18" cy="18" r="14" fill="none" stroke="#1e293b" stroke-width="3"/>
+        <circle cx="18" cy="18" r="14" fill="none" stroke="#3b82f6" stroke-width="3"
+          stroke-dasharray="${2 * Math.PI * 14}"
+          stroke-dashoffset="${2 * Math.PI * 14 * (1 - progress)}"
+          stroke-linecap="round"
+          style="transition: stroke-dashoffset 0.1s linear;"/>
+      </svg>
+      <div class="absolute inset-0 flex items-center justify-center text-xs font-bold">${seconds}</div>
+    </div>
+    <div class="flex-1">
+      <div class="text-xs text-slate-400">Auto-advancing in ${seconds}s</div>
+      <div class="text-sm font-medium">Next: ${SCENES[state.sceneIdx + 1] ? SCENES[state.sceneIdx + 1].title : ""}</div>
+    </div>
+    <button id="cancel-auto" class="text-slate-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-slate-800 transition-colors">Pause</button>
+  `;
+  document.getElementById("cancel-auto").onclick = cancelAutoAdvance;
+}
+
+function hideCountdown() {
+  const el = document.getElementById("auto-advance-countdown");
+  if (el) el.remove();
+}
+
+function nextScene() {
+  if (isLastScene()) return;
+  cancelAutoAdvance();
+  hideApprovalHint();
+  state.sceneIdx += 1;
+  state.phase = "hotspot";
+  renderAll();
+  updateNextButton();
+}
+
+function jumpToScene(idx) {
+  cancelAutoAdvance();
+  hideApprovalHint();
+  state.sceneIdx = idx;
+  state.phase = "hotspot";
+  renderAll();
+  updateNextButton();
+}
+
+function resetDemo() {
+  cancelAutoAdvance();
+  hideApprovalHint();
+  state.sceneIdx = 0;
+  state.messages = [];
+  state.approvals = {};
+  state.phase = "hotspot";
+  document.getElementById("user-input").value = "";
+  renderAll();
+  updateNextButton();
+}
+
+function renderAll() {
+  renderSceneNav();
+  renderPortal();
+  renderHotspot();
+  renderMessages();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+document.getElementById("btn-reset").onclick = resetDemo;
+document.getElementById("btn-next-scene").onclick = nextScene;
+renderAll();
+</script>
+
+</body>
+</html>
