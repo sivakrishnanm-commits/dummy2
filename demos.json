@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Interactive Chart Demo",
+    "description": "Real-time data visualization with interactive controls. Shows how to build responsive charts with live updates.",
+    "url": "demos/chart-demo.html",
+    "tags": ["Data Viz", "Interactive"]
+  },
+  {
+    "title": "Form Validation Demo",
+    "description": "Advanced form validation with real-time feedback. Demonstrates user-friendly error handling and input masking.",
+    "url": "demos/form-demo.html",
+    "tags": ["Forms", "UX"]
+  },
+  {
+    "title": "Animation Showcase",
+    "description": "Smooth animations and transitions using modern web technologies. See how to create engaging user experiences.",
+    "url": "demos/animation-demo.html",
+    "tags": ["Animation", "CSS"]
+  }
+]
